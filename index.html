@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cookie Sorting Game</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+<body>
+
+<h1>🍪 Cookie Sorting Game</h1>
+<p>Hover to see flavour • Drag to jars • Cookies get stored inside the jars!</p>
+
+<div id="cookie-box"></div>
+
+<div id="jars">
+    <div class="jar" data-flavour="Chocolate">
+        <div class="jar-img"></div>
+        <div class="jar-cookies"></div>
+        <p>Chocolate: <span class="count">0</span> cookies</p>
+    </div>
+    <div class="jar" data-flavour="Strawberry">
+        <div class="jar-img"></div>
+        <div class="jar-cookies"></div>
+        <p>Strawberry: <span class="count">0</span> cookies</p>
+    </div>
+    <div class="jar" data-flavour="Vanilla">
+        <div class="jar-img"></div>
+        <div class="jar-cookies"></div>
+        <p>Vanilla: <span class="count">0</span> cookies</p>
+    </div>
+</div>
+
+
+<script src="script.js"></script>
+</body>
+</html>
