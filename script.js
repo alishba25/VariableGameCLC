@@ -1,103 +1,128 @@
-// AUDIO
-const correctSound = new Audio("assets/correct.wav");
-const wrongSound = new Audio("assets/wrong.wav");
-const celebrationSound = new Audio("assets/celebration.mp3");
+// --- Audio System (Synthesizer fallback so it works without files) ---
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+const audioCtx = new AudioContext();
 
-// Create cookies
-const flavours = [];
-const flavourOptions = ["Chocolate", "Strawberry", "Vanilla"];
-for (let i = 0; i < 30; i++) flavours.push(flavourOptions[i % 3]);
+function playSound(type) {
+    // If you have files, uncomment these lines and remove the synth code below:
+    // if(type === 'pop') new Audio('assets/pop.wav').play();
+    // if(type === 'win') new Audio('assets/win.mp3').play();
+    
+    // Synth Fallback
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
 
-const cookieBox = document.getElementById("cookie-box");
-let sortedCount = 0;
-const totalCookies = flavours.length;
-
-// Generate cookies in box
-flavours.forEach(flavour => {
-    const cookie = document.createElement("div");
-    cookie.classList.add("cookie");
-    cookie.draggable = true;
-    cookie.dataset.flavour = flavour;
-
-    const tooltip = document.createElement("span");
-    tooltip.classList.add("flavour-tooltip");
-    tooltip.textContent = flavour;
-
-    cookie.appendChild(tooltip);
-    cookie.addEventListener("dragstart", dragStart);
-    cookieBox.appendChild(cookie);
-});
-
-function dragStart(e) {
-    e.dataTransfer.setData("flavour", e.target.dataset.flavour);
-    window.draggedCookie = e.target;
+    if (type === 'pop') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.1);
+        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.1);
+    } else if (type === 'win') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(600, audioCtx.currentTime + 0.2);
+        osc.frequency.linearRampToValueAtTime(800, audioCtx.currentTime + 0.4);
+        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1.5);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 1.5);
+    }
 }
 
-document.querySelectorAll(".jar").forEach(jar => {
-    jar.addEventListener("dragover", e => e.preventDefault());
-    jar.addEventListener("drop", dropCookie);
-});
+// --- Game Logic ---
 
-function dropCookie(e) {
-    const jarFlavour = e.currentTarget.dataset.flavour;
-    const cookieFlavour = e.dataTransfer.getData("flavour");
-    const jarCookieArea = e.currentTarget.querySelector(".jar-cookies");
+const totalCookies = 30; // Number of cookies to generate
+const cookieBox = document.getElementById("cookie-box");
+let sortedCount = 0;
 
-    if (jarFlavour === cookieFlavour && window.draggedCookie) {
-        correctSound.currentTime = 0;
-        correctSound.play();
-
-        const newCookie = window.draggedCookie.cloneNode(true);
-        newCookie.innerHTML = "";
-        newCookie.draggable = false;
-        newCookie.style.cursor = "default";
-
-        jarCookieArea.appendChild(newCookie);
-        window.draggedCookie.remove();
-        sortedCount++;
-
-        const countEl = e.currentTarget.querySelector(".count");
-        countEl.textContent = parseInt(countEl.textContent) + 1;
-
-        // Dynamic resize
-        const jarHeight = jarCookieArea.clientHeight;
-        const cookiesInJar = jarCookieArea.children;
-        const cookieCount = cookiesInJar.length;
-        const gap = 6; 
-        const maxPerRow = Math.floor(jarCookieArea.clientWidth / 60);
-        const rowsNeeded = Math.ceil(cookieCount / maxPerRow);
-        let maxCookieHeight = (jarHeight - (rowsNeeded - 1) * gap) / rowsNeeded;
-        maxCookieHeight = Math.min(maxCookieHeight, 60);
-
-        for (let c of cookiesInJar) {
-            c.style.width = `${maxCookieHeight}px`;
-            c.style.height = `${maxCookieHeight}px`;
-        }
-
-        checkWin();
-    } else {
-        wrongSound.currentTime = 0;
-        wrongSound.play();
+// Initialize Game
+function initGame() {
+    for (let i = 0; i < totalCookies; i++) {
+        createCookie();
     }
+}
 
-    window.draggedCookie = null;
+function createCookie() {
+    const cookie = document.createElement("div");
+    cookie.classList.add("cookie");
+    
+    // Click Event
+    cookie.addEventListener("click", function() {
+        // Prevent double clicking
+        if (cookie.classList.contains("active") || cookie.classList.contains("sorted")) return;
+
+        // 1. Enlarge & Select
+        cookie.classList.add("active");
+        playSound('pop');
+
+        // 2. Generate Random Number (0-3)
+        const randomJarIndex = Math.floor(Math.random() * 4);
+        cookie.textContent = randomJarIndex; // Show number
+
+        // 3. Move to Jar after delay
+        setTimeout(() => {
+            moveCookieToJar(cookie, randomJarIndex);
+        }, 600); // 0.6 second delay to read the number
+    });
+
+    cookieBox.appendChild(cookie);
+}
+
+function moveCookieToJar(cookieElement, jarIndex) {
+    const jar = document.getElementById(`jar-${jarIndex}`);
+    const jarContainer = jar.querySelector('.jar-cookies');
+    const countSpan = jar.querySelector('.count');
+
+    // Visual transition: Remove from box, create clone in jar
+    // We use a clone to make it look like it arrived there cleanly
+    cookieElement.style.visibility = "hidden"; // Hide original in box
+    cookieElement.classList.add("sorted");
+
+    const newCookie = document.createElement("div");
+    newCookie.classList.add("cookie");
+    // We don't copy the textContent because inside the jar they are just cookies
+    
+    jarContainer.appendChild(newCookie);
+
+    // Update Count
+    let currentCount = parseInt(countSpan.textContent);
+    countSpan.textContent = currentCount + 1;
+
+    sortedCount++;
+    checkWin();
 }
 
 function checkWin() {
     if (sortedCount === totalCookies) {
-        celebrationSound.play();
-        const duration = 3000;
-        const end = Date.now() + duration;
-        (function frame() {
-            confetti({
-                particleCount: 6,
-                spread: 70,
-                origin: { x: Math.random(), y: Math.random() - 0.2 }
-            });
-            if (Date.now() < end) requestAnimationFrame(frame);
-        })();
         setTimeout(() => {
-            alert("🎉 All cookies sorted! Amazing job! 🍪");
-        }, 200);
+            playSound('win');
+            triggerConfetti();
+            // Custom alert style
+            const h1 = document.querySelector('h1');
+            h1.textContent = "🎉 All sorted! Great job! 🍪";
+            h1.style.color = "#d84315";
+        }, 500);
     }
 }
+
+function triggerConfetti() {
+    const duration = 3000;
+    const end = Date.now() + duration;
+
+    (function frame() {
+        confetti({
+            particleCount: 5,
+            spread: 70,
+            origin: { x: Math.random(), y: Math.random() - 0.2 }
+        });
+        if (Date.now() < end) requestAnimationFrame(frame);
+    })();
+}
+
+// Start
+initGame();
